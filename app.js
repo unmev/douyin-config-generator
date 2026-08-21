@@ -7,7 +7,6 @@ import {
   convertToBasic,
   createInitialState,
   formatConfig,
-  getPreviewMessages,
   importConfig,
   validateConfig,
 } from "./config-core.js";
@@ -20,9 +19,8 @@ let state = createInitialState();
 let selectedTargetIndex = 0;
 let composingType = "text";
 let randomPreviewIndex = 0;
-let rawIsDirty = false;
 let importRequestId = 0;
-const replayTimers = new Set();
+let generating = false;
 
 const elements = {
   friendsInput: $("#friendsInput"),
@@ -44,17 +42,8 @@ const elements = {
   timeoutInput: $("#timeoutInput"),
   continueToggle: $("#continueToggle"),
   duplicateToggle: $("#duplicateToggle"),
-  rawEditor: $("#rawEditor"),
-  rawStatus: $("#rawStatus"),
-  chatStream: $("#chatStream"),
-  previewFriendName: $("#previewFriendName"),
-  previewFriendsCount: $("#previewFriendsCount"),
-  previewMessagesCount: $("#previewMessagesCount"),
-  previewDuration: $("#previewDuration"),
-  validationPanel: $("#validationPanel"),
-  validationTitle: $("#validationTitle"),
-  validationSubtitle: $("#validationSubtitle"),
-  validationDetails: $("#validationDetails"),
+  generateButton: $("#generateButton"),
+  generateHint: $("#generateHint"),
   importDialog: $("#importDialog"),
   importText: $("#importText"),
   importError: $("#importError"),
@@ -84,10 +73,6 @@ function currentFriends() {
 
 function currentFriendName() {
   return currentFriends()[state.mode === "advanced" ? selectedTargetIndex : 0] || "好友昵称";
-}
-
-function stickerSymbol(name) {
-  return BUILTIN_STICKERS.find((sticker) => sticker.name === name)?.symbol || "◇";
 }
 
 function icon(name, size = 17) {
@@ -190,6 +175,10 @@ function renderStickerGrid() {
   }).join("") : `<div class="empty-state" style="grid-column:1/-1"><strong>没有匹配的表情</strong><span>可以添加自定义映射</span></div>`;
 }
 
+function stickerSymbol(name) {
+  return BUILTIN_STICKERS.find((sticker) => sticker.name === name)?.symbol || "◇";
+}
+
 function messageSummary(message) {
   if (message.type === "text") return { typeLabel: "文字", content: message.value || "空文字消息", note: "按顺序发送" };
   if (message.type === "sticker" || message.type === "douyin_sticker") return { typeLabel: "原生表情", content: `${stickerSymbol(message.value)}  ${message.value || "未选择表情"}`, note: "运行时打开抖音表情面板" };
@@ -198,12 +187,12 @@ function messageSummary(message) {
   return { typeLabel: "未知", content: `未知类型：${message.type}`, note: "请在原始 JSON 中修改" };
 }
 
-function renderMessages() {
+function renderMessages({ animateIn = true } = {}) {
   const messages = currentMessages();
   elements.messageList.innerHTML = messages.length ? messages.map((message, index) => {
     const summary = messageSummary(message);
     return `
-      <article class="message-item" data-message-index="${index}">
+      <article class="message-item" data-message-index="${index}" style="${animateIn ? "" : "animation: none"}">
         <span class="message-number" aria-label="第 ${index + 1} 条消息">${String(index + 1).padStart(2, "0")}</span>
         <div class="message-copy">
           <strong>${escapeHtml(summary.typeLabel)}</strong>
@@ -229,60 +218,24 @@ function renderValidation(config) {
   const validation = validateConfig(config);
   const hasErrors = validation.errors.length > 0;
   const hasWarnings = !hasErrors && validation.warnings.length > 0;
-  elements.validationPanel.classList.toggle("has-errors", hasErrors);
-  elements.validationPanel.classList.toggle("has-warnings", hasWarnings);
-  elements.validationTitle.textContent = hasErrors ? `${validation.errors.length} 个配置错误` : hasWarnings ? `${validation.warnings.length} 条提醒` : "配置有效";
-  elements.validationSubtitle.textContent = hasErrors ? "修正后才能复制配置" : hasWarnings ? "提醒不会阻止复制" : "可以复制配置";
-  const items = [...validation.errors, ...validation.warnings];
-  elements.validationDetails.innerHTML = items.length ? items.map((item) => `<p class="validation-item"><code>${escapeHtml(item.path)}</code>：${escapeHtml(item.message)}</p>`).join("") : `<p class="validation-item">没有发现问题，当前配置可直接使用。</p>`;
-  $("#copyTopButton").disabled = hasErrors;
-  return validation;
-}
-
-function renderRaw(config, force = false) {
-  if (!rawIsDirty || force) {
-    elements.rawEditor.value = formatConfig(config);
-    rawIsDirty = false;
-    elements.rawStatus.textContent = "与可视化表单同步";
-  }
-}
-
-function renderPreview(config, animate = false) {
-  replayTimers.forEach((timer) => window.clearTimeout(timer));
-  replayTimers.clear();
-  const messages = getPreviewMessages(currentMessages(), randomPreviewIndex);
-  elements.previewFriendName.textContent = currentFriendName();
-  elements.previewFriendsCount.textContent = currentFriends().length;
-  elements.previewMessagesCount.textContent = messages.length;
-  const interval = config.send_interval_seconds;
-  elements.previewDuration.textContent = interval.min === interval.max ? `${interval.min} 秒` : `${interval.min}–${interval.max} 秒`;
-
-  elements.chatStream.innerHTML = `<p class="chat-date">今天 09:41</p>`;
-  const appendMessage = (message, index) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "chat-row";
-    wrapper.style.animationDelay = animate ? "0ms" : `${index * 55}ms`;
-    const randomLabel = message.fromRandom ? `<span class="random-label">本次随机预览</span>` : "";
-    if (message.type === "sticker" || message.type === "douyin_sticker") {
-      wrapper.innerHTML = `<div class="chat-bubble is-sticker" title="实际发送抖音原生表情：${escapeHtml(message.value)}"><span class="preview-symbol">${escapeHtml(stickerSymbol(message.value))}</span><small>${escapeHtml(message.value)} · 原生表情</small>${randomLabel}</div>`;
-    } else if (message.type === "image") {
-      wrapper.innerHTML = `<div class="chat-bubble">${icon("file", 18)}<span>图片：${escapeHtml(message.value)}</span>${randomLabel}</div>`;
-    } else {
-      wrapper.innerHTML = `<div class="chat-bubble">${escapeHtml(message.value).replace(/\n/g, "<br>")}${randomLabel}</div>`;
-    }
-    elements.chatStream.append(wrapper);
-  };
-  if (animate) {
-    messages.forEach((message, index) => {
-      const timer = window.setTimeout(() => {
-        replayTimers.delete(timer);
-        appendMessage(message, index);
-      }, index * 430);
-      replayTimers.add(timer);
-    });
+  const hint = elements.generateHint;
+  const iconEl = hint.querySelector("svg use");
+  const label = hint.querySelector("span");
+  const isError = hint.classList.contains("is-error") ? hint : null;
+  if (hasErrors) {
+    hint.classList.add("is-error");
+    if (iconEl) iconEl.setAttribute("href", "#icon-info");
+    if (label) label.textContent = `${validation.errors.length} 个配置错误，无法生成`;
+  } else if (hasWarnings) {
+    hint.classList.remove("is-error");
+    if (iconEl) iconEl.setAttribute("href", "#icon-info");
+    if (label) label.textContent = `${validation.warnings.length} 条提醒，请检查后生成`;
   } else {
-    messages.forEach(appendMessage);
+    hint.classList.remove("is-error");
+    if (iconEl) iconEl.setAttribute("href", "#icon-shield");
+    if (label) label.textContent = "当前配置有效，可安全生成";
   }
+  return validation;
 }
 
 function renderCounts() {
@@ -292,30 +245,41 @@ function renderCounts() {
   elements.messageCount.textContent = `${messageCount} 条消息`;
 }
 
-function sync({ forceRaw = false, animate = false, renderTargetEditors = true } = {}) {
+function sync({ animateIn = true, renderTargetEditors = true } = {}) {
   const config = buildSafeConfig();
   renderCounts();
-  renderMessages();
+  renderMessages({ animateIn });
   if (renderTargetEditors) renderTargets();
   renderStickerGrid();
   renderValidation(config);
-  renderRaw(config, forceRaw);
-  renderPreview(config, animate);
 }
 
 function showToast(message, error = false) {
   const toast = document.createElement("div");
   toast.className = `toast${error ? " is-error" : ""}`;
-  toast.innerHTML = `${icon(error ? "info" : "shield")}<span>${escapeHtml(message)}</span>`;
+  toast.innerHTML = `${icon(error ? "info" : "shield", 18)}<span>${escapeHtml(message)}</span>`;
   elements.toastRegion.append(toast);
-  window.setTimeout(() => toast.remove(), 2800);
+  window.setTimeout(() => {
+    toast.classList.add("is-removing");
+    window.setTimeout(() => toast.remove(), 220);
+  }, 2800);
+}
+
+function animateItemRemoval(element) {
+  element.classList.add("is-removing");
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      element.remove();
+      resolve();
+    }, 180);
+  });
 }
 
 function addMessage(message) {
   const messages = [...currentMessages(), message];
   setCurrentMessages(messages);
   randomPreviewIndex += 1;
-  sync({ animate: true });
+  sync({ animateIn: true });
 }
 
 function moveItem(items, index, direction) {
@@ -352,7 +316,6 @@ function switchMode(mode) {
     state = convertToBasic(state);
   }
   selectedTargetIndex = 0;
-  $$(".format-option").forEach((button) => button.classList.toggle("is-active", button.dataset.mode === state.mode));
   sync();
 }
 
@@ -364,10 +327,8 @@ function applyImportedConfig(raw) {
   }
   state = result.state;
   selectedTargetIndex = 0;
-  rawIsDirty = false;
-  $$(".format-option").forEach((button) => button.classList.toggle("is-active", button.dataset.mode === state.mode));
   renderSettings();
-  sync({ forceRaw: true, animate: true });
+  sync();
   showToast("配置导入成功");
 }
 
@@ -392,24 +353,56 @@ async function readFile(file) {
   }
 }
 
-async function copyConfig() {
+function downloadConfig(config) {
+  const blob = new Blob([formatConfig(config)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "config.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function generateConfig() {
+  if (generating) return;
   const config = buildSafeConfig();
   const validation = validateConfig(config);
-  if (validation.errors.length) return showToast("请先修正配置错误", true);
+  if (validation.errors.length) {
+    showToast("请先修正配置错误再生成", true);
+    return;
+  }
+  generating = true;
+  elements.generateButton.classList.add("is-generating");
+  const label = elements.generateButton.querySelector(".btn-label");
+  const original = label.textContent;
+  label.textContent = "正在生成…";
   try {
-    await navigator.clipboard.writeText(formatConfig(config));
-    showToast("已复制，可直接粘贴到 DOUYIN_CONFIG");
-  } catch {
-    elements.rawEditor.select();
-    document.execCommand("copy");
-    showToast("已复制配置 JSON");
+    await new Promise((resolve) => window.setTimeout(resolve, 620));
+    downloadConfig(config);
+    showToast("配置生成成功！已下载 config.json");
+  } finally {
+    label.textContent = original;
+    elements.generateButton.classList.remove("is-generating");
+    generating = false;
+  }
+}
+
+async function removeMessageWithAnimation(article) {
+  await animateItemRemoval(article);
+  const messages = currentMessages();
+  const index = Number(article.dataset.messageIndex);
+  if (index >= 0 && index < messages.length) {
+    setCurrentMessages(messages.filter((_, itemIndex) => itemIndex !== index));
+    sync({ animateIn: false });
   }
 }
 
 function bindEvents() {
   elements.friendsInput.addEventListener("input", () => {
     state.friends = parseFriends(elements.friendsInput.value);
-    sync({ renderTargetEditors: false });
+    sync({ renderTargetEditors: false, animateIn: false });
   });
   $("#cleanFriendsButton").addEventListener("click", () => {
     state.friends = [...new Set(parseFriends(elements.friendsInput.value))];
@@ -450,21 +443,26 @@ function bindEvents() {
     if (!action) return;
     const messages = currentMessages();
     const index = Number(action.dataset.messageIndex ?? action.dataset.messageRemove ?? action.dataset.messageDuplicate);
-    if (action.dataset.messageMove) setCurrentMessages(moveItem(messages, index, action.dataset.messageMove));
-    if (action.dataset.messageRemove !== undefined) setCurrentMessages(messages.filter((_, itemIndex) => itemIndex !== index));
+    if (action.dataset.messageMove) {
+      setCurrentMessages(moveItem(messages, index, action.dataset.messageMove));
+      sync({ animateIn: false });
+    }
+    if (action.dataset.messageRemove !== undefined) {
+      const article = action.closest(".message-item");
+      removeMessageWithAnimation(article);
+    }
     if (action.dataset.messageDuplicate !== undefined) {
       const copy = clone(messages[index]);
       const next = [...messages];
       next.splice(index + 1, 0, copy);
       setCurrentMessages(next);
+      sync({ animateIn: true });
     }
-    sync();
   });
-  $$(".format-option").forEach((button) => button.addEventListener("click", () => switchMode(button.dataset.mode)));
   elements.advancedTargetsEditor.addEventListener("input", (event) => {
     if (event.target.dataset.targetName === undefined) return;
     state.targets[Number(event.target.dataset.targetName)].name = event.target.value;
-    sync({ renderTargetEditors: false });
+    sync({ renderTargetEditors: false, animateIn: false });
   });
   elements.advancedTargetsEditor.addEventListener("click", (event) => {
     const button = event.target.closest("button");
@@ -472,48 +470,31 @@ function bindEvents() {
     if (button.id === "addTargetButton") {
       state.targets.push({ name: `好友 ${state.targets.length + 1}`, messages: clone(currentMessages()), extras: {} });
       selectedTargetIndex = state.targets.length - 1;
+      sync({ animateIn: false });
     } else if (button.dataset.targetSelect !== undefined) {
       selectedTargetIndex = Number(button.dataset.targetSelect);
+      sync({ animateIn: false });
     } else if (button.dataset.targetRemove !== undefined) {
       state.targets.splice(Number(button.dataset.targetRemove), 1);
       selectedTargetIndex = Math.min(selectedTargetIndex, Math.max(0, state.targets.length - 1));
+      sync({ animateIn: false });
     } else if (button.dataset.targetMove) {
       const index = Number(button.dataset.targetIndex);
       state.targets = moveItem(state.targets, index, button.dataset.targetMove);
       selectedTargetIndex = index + (button.dataset.targetMove === "up" ? -1 : 1);
+      sync({ animateIn: false });
     }
-    sync();
   });
 
-  [elements.taskIdInput, elements.timezoneInput, elements.intervalMinInput, elements.intervalMaxInput, elements.retryInput, elements.timeoutInput].forEach((input) => input.addEventListener("input", () => sync()));
-  [elements.continueToggle, elements.duplicateToggle].forEach((input) => input.addEventListener("change", () => sync()));
+  [elements.taskIdInput, elements.timezoneInput, elements.intervalMinInput, elements.intervalMaxInput, elements.retryInput, elements.timeoutInput].forEach((input) => input.addEventListener("input", () => sync({ animateIn: false })));
+  [elements.continueToggle, elements.duplicateToggle].forEach((input) => input.addEventListener("change", () => sync({ animateIn: false })));
   $("#resetSettingsButton").addEventListener("click", () => {
     state.settings = clone(CONFIG_DEFAULTS);
     renderSettings();
-    sync();
+    sync({ animateIn: false });
     showToast("已恢复默认运行设置");
   });
-  elements.rawEditor.addEventListener("input", () => {
-    rawIsDirty = true;
-    elements.rawStatus.textContent = "有尚未应用的 JSON 修改";
-  });
-  $("#applyRawButton").addEventListener("click", () => {
-    try {
-      applyImportedConfig(JSON.parse(elements.rawEditor.value));
-    } catch (error) {
-      elements.rawStatus.textContent = `JSON 错误：${error.message}`;
-      showToast("JSON 格式无效", true);
-    }
-  });
-  $("#toggleValidationButton").addEventListener("click", () => {
-    elements.validationDetails.hidden = !elements.validationDetails.hidden;
-    $("#toggleValidationButton").setAttribute("aria-expanded", String(!elements.validationDetails.hidden));
-  });
-  $("#replayButton").addEventListener("click", () => {
-    randomPreviewIndex += 1;
-    renderPreview(buildSafeConfig(), true);
-  });
-  $("#copyTopButton").addEventListener("click", copyConfig);
+  elements.generateButton.addEventListener("click", generateConfig);
   $("#importButton").addEventListener("click", () => {
     elements.importError.textContent = "";
     elements.importDialog.showModal();
@@ -572,10 +553,6 @@ function bindEvents() {
     $("#themeButton").title = label;
     try { localStorage.setItem("config-theme", next); } catch {}
   });
-  $$(".step-tab").forEach((button) => button.addEventListener("click", () => {
-    document.getElementById(button.dataset.scroll).scrollIntoView({ behavior: "smooth", block: "start" });
-    $$(".step-tab").forEach((item) => item.classList.toggle("is-active", item === button));
-  }));
   const composerTabs = $$(".composer-tab");
   composerTabs.forEach((button, index) => button.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -595,7 +572,7 @@ function initialize() {
   } catch {}
   renderSettings();
   bindEvents();
-  sync({ forceRaw: true, animate: true });
+  sync({ animateIn: false });
 }
 
 initialize();
