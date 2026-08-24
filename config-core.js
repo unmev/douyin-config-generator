@@ -9,18 +9,16 @@ export const CONFIG_DEFAULTS = Object.freeze({
 });
 
 export const BUILTIN_STICKERS = Object.freeze([
-  { name: "比心", label: "比心", symbol: "♡", category: "常用", fallback_index: 3, accent: "pink" },
-  { name: "开心", label: "开心", symbol: "😄", category: "常用", fallback_index: 5, accent: "yellow" },
-  { name: "爱心", label: "爱心", symbol: "❤", category: "常用", fallback_index: 0, accent: "red" },
-  { name: "点赞", label: "点赞", symbol: "👍", category: "常用", fallback_index: 1, accent: "blue" },
-  { name: "抱抱", label: "抱抱", symbol: "🤗", category: "常用", fallback_index: 2, accent: "orange" },
-  { name: "玫瑰", label: "玫瑰", symbol: "🌹", category: "常用", fallback_index: 4, accent: "red" },
-  { name: "大笑", label: "大笑", symbol: "😂", category: "常用", fallback_index: 6, accent: "yellow" },
-  { name: "加油", label: "加油", symbol: "💪", category: "常用", fallback_index: 7, accent: "purple" },
-  { name: "晚安", label: "晚安", symbol: "🌙", category: "常用", fallback_index: 8, accent: "blue" },
-  { name: "庆祝", label: "庆祝", symbol: "🎉", category: "常用", fallback_index: 9, accent: "pink" },
-  { name: "握手", label: "握手", symbol: "🤝", category: "常用", fallback_index: 10, accent: "orange" },
-  { name: "星星眼", label: "星星眼", symbol: "🤩", category: "常用", fallback_index: 11, accent: "purple" },
+  { name: "嗨", label: "嗨", image: "src/image/stickers/嗨.png" },
+  { name: "爱心", label: "爱心", image: "src/image/stickers/爱心.png" },
+  { name: "比心", label: "比心", image: "src/image/stickers/比心.png", fallback_index: 1 },
+  { name: "晚上好", label: "晚上好", image: "src/image/stickers/晚上好.png" },
+  { name: "笑死", label: "笑死", image: "src/image/stickers/笑死.png" },
+  { name: "续火花", label: "续火花", image: "src/image/stickers/续火花.png", fallback_index: 0 },
+  { name: "在干嘛", label: "在干嘛", image: "src/image/stickers/在干嘛.png" },
+  { name: "早上好", label: "早上好", image: "src/image/stickers/早上好.png" },
+  { name: "早点睡", label: "早点睡", image: "src/image/stickers/早点睡.png" },
+  { name: "躺平", label: "躺平", image: "src/image/stickers/躺平.png" },
 ]);
 
 const ROOT_FIELDS = new Set([
@@ -67,12 +65,15 @@ function pickUnknown(source, known) {
 function defaultStickerMap() {
   return Object.fromEntries(BUILTIN_STICKERS.map((sticker) => [
     sticker.name,
-    {
-      label: sticker.label,
-      category: sticker.category,
-      fallback_index: sticker.fallback_index,
-    },
+    builtinStickerMapping(sticker),
   ]));
+}
+
+function builtinStickerMapping(sticker) {
+  return {
+    label: sticker.label,
+    ...(Number.isInteger(sticker.fallback_index) ? { fallback_index: sticker.fallback_index } : {}),
+  };
 }
 
 function normalizeStickerMap(raw) {
@@ -116,16 +117,13 @@ function serializeMessage(message) {
 }
 
 function createDefaultMessages() {
-  return [
-    normalizeMessage({ type: "text", value: "今天也要开心呀 ✨" }),
-    normalizeMessage({ type: "sticker", value: "比心" }),
-  ];
+  return [];
 }
 
 export function createInitialState() {
   return {
     mode: "basic",
-    friends: ["好友昵称"],
+    friends: [],
     messages: createDefaultMessages(),
     targets: [],
     stickers: defaultStickerMap(),
@@ -206,11 +204,7 @@ export function buildConfig(state) {
   if (stickerNames.length) {
     result.stickers = Object.fromEntries(stickerNames.map((name) => {
       const builtIn = BUILTIN_STICKERS.find((item) => item.name === name);
-      const mapping = state.stickers?.[name] || (builtIn ? {
-        label: builtIn.label,
-        category: builtIn.category,
-        fallback_index: builtIn.fallback_index,
-      } : {});
+      const mapping = builtIn ? builtinStickerMapping(builtIn) : state.stickers?.[name] || {};
       return [name, clone(mapping)];
     }));
   }

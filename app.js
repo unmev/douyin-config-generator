@@ -14,45 +14,142 @@ import {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const STORAGE_KEY = "douyin-config-editor-draft-v1";
 
 let state = createInitialState();
 let selectedTargetIndex = 0;
 let composingType = "text";
-let randomPreviewIndex = 0;
 let importRequestId = 0;
-let generating = false;
+let draggedMessageId = null;
+let nextUiId = 1;
+let isInitializing = true;
+let hasUnsavedChanges = false;
+let storageWarningShown = false;
 
 const elements = {
-  friendsInput: $("#friendsInput"),
+  friendNameInput: $("#friendNameInput"),
+  friendList: $("#friendList"),
   friendCount: $("#friendCount"),
   messageCount: $("#messageCount"),
-  basicFriendsEditor: $("#basicFriendsEditor"),
-  advancedTargetsEditor: $("#advancedTargetsEditor"),
   messageInput: $("#messageInput"),
-  characterCount: $("#characterCount"),
   stickerGrid: $("#stickerGrid"),
-  stickerSearch: $("#stickerSearch"),
   messageList: $("#messageList"),
   randomChoicesInput: $("#randomChoicesInput"),
   taskIdInput: $("#taskIdInput"),
   timezoneInput: $("#timezoneInput"),
   intervalMinInput: $("#intervalMinInput"),
   intervalMaxInput: $("#intervalMaxInput"),
+  intervalMinValue: $("#intervalMinValue"),
+  intervalMaxValue: $("#intervalMaxValue"),
+  intervalRangeFill: $("#intervalRangeFill"),
   retryInput: $("#retryInput"),
   timeoutInput: $("#timeoutInput"),
   continueToggle: $("#continueToggle"),
   duplicateToggle: $("#duplicateToggle"),
-  generateButton: $("#generateButton"),
-  generateHint: $("#generateHint"),
-  importDialog: $("#importDialog"),
   importText: $("#importText"),
   importError: $("#importError"),
-  stickerDialog: $("#stickerDialog"),
-  stickerError: $("#stickerError"),
   fileInput: $("#fileInput"),
   dropOverlay: $("#dropOverlay"),
   toastRegion: $("#toastRegion"),
+  resetConfigButton: $("#resetConfigButton"),
+  importFileButton: $("#importFileButton"),
+  importClipboardButton: $("#importClipboardButton"),
+  pasteImportPanel: $("#pasteImportPanel"),
+  cronButton: $("#cronButton"),
+  cronDialog: $("#cronDialog"),
+  cronTimeInput: $("#cronTimeInput"),
+  cronOutput: $("#cronOutput"),
+  cronWarning: $("#cronWarning"),
+  copyCronButton: $("#copyCronButton"),
+  completeButton: $("#completeButton"),
+  completeDialog: $("#completeDialog"),
+  clearDialog: $("#clearDialog"),
+  completeError: $("#completeError"),
+  copyConfigButton: $("#copyConfigButton"),
+  downloadConfigButton: $("#downloadConfigButton"),
+  confirmClearButton: $("#confirmClearButton"),
+  wizardError: $("#wizardError"),
+  validationList: $("#validationList"),
+  generateHint: $("#generateHint"),
 };
+
+function icon(name, size = 17) {
+  return `<svg aria-hidden="true" width="${size}" height="${size}"><use href="#icon-${name}"></use></svg>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
+  })[character]);
+}
+
+function parseLines(value) {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+function stripRuntimeFields(value) {
+  if (Array.isArray(value)) return value.map(stripRuntimeFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "uiId")
+      .map(([key, child]) => [key, stripRuntimeFields(child)]),
+  );
+}
+
+function isStateDraft(value) {
+  return Boolean(
+    value
+    && typeof value === "object"
+    && ["basic", "advanced"].includes(value.mode)
+    && Array.isArray(value.friends)
+    && Array.isArray(value.messages)
+    && Array.isArray(value.targets)
+    && value.settings
+    && typeof value.settings === "object"
+    && value.settings.send_interval_seconds
+    && typeof value.settings.send_interval_seconds === "object",
+  );
+}
+
+function saveDraft() {
+  if (isInitializing) return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: 1,
+      savedAt: new Date().toISOString(),
+      state: stripRuntimeFields(state),
+      selectedTargetIndex,
+      composingType,
+    }));
+  } catch {
+    if (!storageWarningShown) {
+      storageWarningShown = true;
+      showToast("浏览器缓存写入失败", true);
+    }
+  }
+}
+
+function loadDraft() {
+  try {
+    const draft = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "null");
+    if (!draft || draft.version !== 1 || !isStateDraft(draft.state)) return false;
+    state = draft.state;
+    selectedTargetIndex = Number.isInteger(draft.selectedTargetIndex) ? Math.max(0, draft.selectedTargetIndex) : 0;
+    composingType = ["text", "sticker", "random"].includes(draft.composingType) ? draft.composingType : "text";
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markDirty() {
+  if (!isInitializing) hasUnsavedChanges = true;
+}
+
+function markSaved() {
+  hasUnsavedChanges = false;
+}
 
 function currentMessages() {
   if (state.mode === "advanced") return state.targets[selectedTargetIndex]?.messages || [];
@@ -71,36 +168,21 @@ function currentFriends() {
   return state.mode === "advanced" ? state.targets.map((target) => target.name) : state.friends;
 }
 
-function currentFriendName() {
-  return currentFriends()[state.mode === "advanced" ? selectedTargetIndex : 0] || "好友昵称";
-}
-
-function icon(name, size = 17) {
-  return `<svg aria-hidden="true" width="${size}" height="${size}"><use href="#icon-${name}"></use></svg>`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>'"]/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
-  })[character]);
-}
-
-function parseFriends(value) {
-  return value.split(/[\n,，]/).map((name) => name.trim()).filter(Boolean);
-}
-
-function parseLines(value) {
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+function ensureUiId(message) {
+  if (!message.uiId) {
+    message.uiId = `m${nextUiId}`;
+    nextUiId += 1;
+  }
+  return message.uiId;
 }
 
 function updateSettingsFromForm() {
+  const min = Number(elements.intervalMinInput.value);
+  const max = Number(elements.intervalMaxInput.value);
   state.settings = {
     task_id: elements.taskIdInput.value,
     timezone: elements.timezoneInput.value,
-    send_interval_seconds: {
-      min: elements.intervalMinInput.valueAsNumber,
-      max: elements.intervalMaxInput.valueAsNumber,
-    },
+    send_interval_seconds: { min, max },
     continue_on_error: elements.continueToggle.checked,
     prevent_duplicates: elements.duplicateToggle.checked,
     target_open_retries: elements.retryInput.valueAsNumber,
@@ -108,105 +190,86 @@ function updateSettingsFromForm() {
   };
 }
 
+function renderIntervalSlider() {
+  const min = Number(elements.intervalMinInput.value);
+  const max = Number(elements.intervalMaxInput.value);
+  elements.intervalMinValue.textContent = `${min}`;
+  elements.intervalMaxValue.textContent = `${max}`;
+  elements.intervalRangeFill.style.left = `${min * 10}%`;
+  elements.intervalRangeFill.style.right = `${100 - max * 10}%`;
+}
+
 function renderSettings() {
   const settings = state.settings;
   elements.taskIdInput.value = settings.task_id;
   elements.timezoneInput.value = settings.timezone;
-  elements.intervalMinInput.value = settings.send_interval_seconds.min;
-  elements.intervalMaxInput.value = settings.send_interval_seconds.max;
+  elements.intervalMinInput.value = Math.max(0, Math.min(10, settings.send_interval_seconds.min));
+  elements.intervalMaxInput.value = Math.max(0, Math.min(10, settings.send_interval_seconds.max));
   elements.retryInput.value = settings.target_open_retries;
   elements.timeoutInput.value = settings.target_open_timeout_seconds;
   elements.continueToggle.checked = settings.continue_on_error;
   elements.duplicateToggle.checked = settings.prevent_duplicates;
+  renderIntervalSlider();
 }
 
-function renderTargets() {
-  elements.basicFriendsEditor.hidden = state.mode !== "basic";
-  elements.advancedTargetsEditor.hidden = state.mode !== "advanced";
-  if (state.mode === "basic") {
-    elements.friendsInput.value = state.friends.join("\n");
-    return;
+function renderMode() {
+  $$("[data-switch-mode]").forEach((button) => {
+    const active = button.dataset.switchMode === state.mode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function renderFriends() {
+  renderMode();
+  const friends = currentFriends();
+  elements.friendCount.textContent = `${friends.filter((name) => String(name || "").trim()).length} 位好友`;
+  if (state.mode === "advanced" && selectedTargetIndex >= state.targets.length) {
+    selectedTargetIndex = Math.max(0, state.targets.length - 1);
   }
-  if (selectedTargetIndex >= state.targets.length) selectedTargetIndex = Math.max(0, state.targets.length - 1);
-  const selected = state.targets[selectedTargetIndex];
-  const tabs = state.targets.map((target, index) => `
-    <button class="target-chip ${index === selectedTargetIndex ? "is-active" : ""}" type="button" data-target-select="${index}" aria-pressed="${index === selectedTargetIndex}">
-      <span>${index + 1}</span>${escapeHtml(target.name || `好友 ${index + 1}`)}<small>${target.messages.length}</small>
-    </button>
-  `).join("");
-  elements.advancedTargetsEditor.innerHTML = `
-    <div class="target-toolbar">
-      <div class="target-tabs" aria-label="高级模式好友">${tabs || '<span class="empty-inline">尚未添加好友</span>'}</div>
-      <button class="button button-secondary" id="addTargetButton" type="button">${icon("plus")}添加好友</button>
-    </div>
-    ${selected ? `<div class="target-edit-box">
-      <div>
-        <label class="field-label" for="selectedTargetName">当前好友昵称</label>
-        <input id="selectedTargetName" data-target-name="${selectedTargetIndex}" value="${escapeHtml(selected.name)}" placeholder="好友昵称">
-        <div class="input-footer"><span>下方发送队列只属于当前好友</span><span>${selected.messages.length} 条消息</span></div>
-      </div>
-      <div class="target-actions">
-        <button class="mini-button" type="button" data-target-move="up" data-target-index="${selectedTargetIndex}" title="上移好友" aria-label="上移好友" ${selectedTargetIndex === 0 ? "disabled" : ""}>${icon("up")}</button>
-        <button class="mini-button" type="button" data-target-move="down" data-target-index="${selectedTargetIndex}" title="下移好友" aria-label="下移好友" ${selectedTargetIndex === state.targets.length - 1 ? "disabled" : ""}>${icon("down")}</button>
-        <button class="mini-button danger" type="button" data-target-remove="${selectedTargetIndex}" title="删除好友" aria-label="删除当前好友">${icon("trash")}</button>
-      </div>
-    </div>` : '<div class="empty-state"><strong>还没有好友</strong><span>添加好友后即可编排专属消息</span></div>'}
-  `;
+  elements.friendList.innerHTML = friends.length ? friends.map((name, index) => `
+    <article class="friend-item ${state.mode === "advanced" && index === selectedTargetIndex ? "is-active" : ""}" data-friend-index="${index}">
+      <button class="friend-select" type="button" data-friend-select="${index}" ${state.mode === "basic" ? "tabindex=\"-1\"" : ""}>
+        <span>${escapeHtml(name)}</span>
+      </button>
+      <button class="mini-button danger" type="button" data-friend-remove="${index}" aria-label="删除好友 ${escapeHtml(name)}">${icon("trash")}</button>
+    </article>
+  `).join("") : `<div class="empty-state">还没有好友</div>`;
 }
 
 function renderStickerGrid() {
-  const query = elements.stickerSearch.value.trim().toLowerCase();
-  const builtin = BUILTIN_STICKERS.filter((sticker) => sticker.name.toLowerCase().includes(query));
-  const custom = Object.keys(state.stickers || {})
-    .filter((name) => !BUILTIN_STICKERS.some((item) => item.name === name))
-    .filter((name) => name.toLowerCase().includes(query))
-    .map((name) => ({ name, label: state.stickers[name]?.label || state.stickers[name]?.accessible_name || name, symbol: "◇" }));
-  const stickers = [...builtin, ...custom];
-  elements.stickerGrid.innerHTML = stickers.length ? stickers.map((sticker) => {
-    const mapping = state.stickers?.[sticker.name] || {};
-    const category = mapping.category || sticker.category || "自定义";
-    return `
-      <button class="sticker-option" type="button" data-sticker="${escapeHtml(sticker.name)}" aria-label="添加原生表情 ${escapeHtml(sticker.name)}">
-        <span class="sticker-symbol" aria-hidden="true">${sticker.symbol}</span>
-        <strong>${escapeHtml(sticker.name)}</strong>
-        <small>${escapeHtml(category)}</small>
-      </button>
-    `;
-  }).join("") : `<div class="empty-state" style="grid-column:1/-1"><strong>没有匹配的表情</strong><span>可以添加自定义映射</span></div>`;
-}
-
-function stickerSymbol(name) {
-  return BUILTIN_STICKERS.find((sticker) => sticker.name === name)?.symbol || "◇";
+  elements.stickerGrid.innerHTML = BUILTIN_STICKERS.map((sticker) => `
+    <button class="sticker-option" type="button" data-sticker="${escapeHtml(sticker.name)}" aria-label="添加原生表情 ${escapeHtml(sticker.name)}">
+      <img src="${escapeHtml(encodeURI(sticker.image))}" alt="" loading="lazy">
+      <strong>${escapeHtml(sticker.name)}</strong>
+    </button>
+  `).join("");
 }
 
 function messageSummary(message) {
-  if (message.type === "text") return { typeLabel: "文字", content: message.value || "空文字消息", note: "按顺序发送" };
-  if (message.type === "sticker" || message.type === "douyin_sticker") return { typeLabel: "原生表情", content: `${stickerSymbol(message.value)}  ${message.value || "未选择表情"}`, note: "运行时打开抖音表情面板" };
-  if (message.type === "random") return { typeLabel: "随机", content: `${message.choices?.length || 0} 个候选项`, note: "运行时随机选择一条" };
-  if (message.type === "image") return { typeLabel: "图片", content: message.value || "图片路径", note: "从配置路径读取图片" };
-  return { typeLabel: "未知", content: `未知类型：${message.type}`, note: "请在原始 JSON 中修改" };
+  if (message.type === "text") return { typeLabel: "文字", content: message.value || "空文字消息" };
+  if (message.type === "sticker" || message.type === "douyin_sticker") return { typeLabel: "原生表情", content: message.value || "未选择表情" };
+  if (message.type === "random") return { typeLabel: "随机", content: `${message.choices?.length || 0} 个候选项` };
+  if (message.type === "image") return { typeLabel: "图片", content: message.value || "图片路径" };
+  return { typeLabel: "未知", content: `未知类型：${message.type}` };
 }
 
 function renderMessages({ animateIn = true } = {}) {
   const messages = currentMessages();
-  elements.messageList.innerHTML = messages.length ? messages.map((message, index) => {
+  elements.messageCount.textContent = `${messages.length} 条消息`;
+  elements.messageList.innerHTML = messages.length ? messages.map((message) => {
     const summary = messageSummary(message);
+    const uiId = ensureUiId(message);
     return `
-      <article class="message-item" data-message-index="${index}" style="${animateIn ? "" : "animation: none"}">
-        <span class="message-number" aria-label="第 ${index + 1} 条消息">${String(index + 1).padStart(2, "0")}</span>
+      <article class="message-item" data-message-id="${uiId}" style="${animateIn ? "" : "animation: none"}">
+        <button class="drag-handle" type="button" draggable="true" aria-label="拖动消息">${icon("grip", 18)}</button>
         <div class="message-copy">
           <strong>${escapeHtml(summary.typeLabel)}</strong>
           <p>${escapeHtml(summary.content)}</p>
-          <small>${escapeHtml(summary.note)}</small>
         </div>
-        <div class="message-actions">
-          <button class="mini-button" type="button" data-message-move="up" data-message-index="${index}" aria-label="上移消息" title="上移" ${index === 0 ? "disabled" : ""}>${icon("up")}</button>
-          <button class="mini-button" type="button" data-message-move="down" data-message-index="${index}" aria-label="下移消息" title="下移" ${index === messages.length - 1 ? "disabled" : ""}>${icon("down")}</button>
-          <button class="mini-button" type="button" data-message-duplicate="${index}" aria-label="复制消息" title="复制">${icon("copy")}</button>
-          <button class="mini-button danger" type="button" data-message-remove="${index}" aria-label="删除消息" title="删除">${icon("trash")}</button>
-        </div>
+        <button class="mini-button danger" type="button" data-message-remove="${uiId}" aria-label="删除消息">${icon("trash")}</button>
       </article>`;
-  }).join("") : `<div class="empty-state"><strong>发送队列为空</strong><span>从上方添加文字、原生表情或随机消息</span></div>`;
+  }).join("") : `<div class="empty-state">发送队列为空</div>`;
 }
 
 function buildSafeConfig() {
@@ -218,40 +281,39 @@ function renderValidation(config) {
   const validation = validateConfig(config);
   const hasErrors = validation.errors.length > 0;
   const hasWarnings = !hasErrors && validation.warnings.length > 0;
-  const hint = elements.generateHint;
-  const iconEl = hint.querySelector("svg use");
-  const label = hint.querySelector("span");
-  const isError = hint.classList.contains("is-error") ? hint : null;
+  const iconEl = elements.generateHint.querySelector("svg use");
+  const label = elements.generateHint.querySelector("span");
+  elements.generateHint.classList.toggle("is-error", hasErrors);
   if (hasErrors) {
-    hint.classList.add("is-error");
     if (iconEl) iconEl.setAttribute("href", "#icon-info");
-    if (label) label.textContent = `${validation.errors.length} 个配置错误，无法生成`;
+    if (label) label.textContent = `${validation.errors.length} 个配置错误`;
   } else if (hasWarnings) {
-    hint.classList.remove("is-error");
     if (iconEl) iconEl.setAttribute("href", "#icon-info");
-    if (label) label.textContent = `${validation.warnings.length} 条提醒，请检查后生成`;
+    if (label) label.textContent = `${validation.warnings.length} 条提醒`;
   } else {
-    hint.classList.remove("is-error");
     if (iconEl) iconEl.setAttribute("href", "#icon-shield");
-    if (label) label.textContent = "当前配置有效，可安全生成";
+    if (label) label.textContent = "配置有效";
   }
+  const items = hasErrors ? validation.errors : validation.warnings;
+  elements.validationList.innerHTML = items.length
+    ? items.map((item) => `<div class="validation-item ${hasErrors ? "is-error" : ""}"><strong>${escapeHtml(item.path)}</strong><span>${escapeHtml(item.message)}</span></div>`).join("")
+    : `<div class="validation-empty">没有发现阻塞问题</div>`;
   return validation;
 }
 
-function renderCounts() {
-  const friendCount = currentFriends().length;
-  const messageCount = currentMessages().length;
-  elements.friendCount.textContent = `${friendCount} 位好友`;
-  elements.messageCount.textContent = `${messageCount} 条消息`;
-}
-
-function sync({ animateIn = true, renderTargetEditors = true } = {}) {
+function sync({ animateIn = true } = {}) {
   const config = buildSafeConfig();
-  renderCounts();
+  renderFriends();
   renderMessages({ animateIn });
-  if (renderTargetEditors) renderTargets();
   renderStickerGrid();
   renderValidation(config);
+  saveDraft();
+}
+
+function showWizardError(message, field) {
+  elements.wizardError.textContent = message;
+  field?.focus();
+  return false;
 }
 
 function showToast(message, error = false) {
@@ -262,61 +324,116 @@ function showToast(message, error = false) {
   window.setTimeout(() => {
     toast.classList.add("is-removing");
     window.setTimeout(() => toast.remove(), 220);
-  }, 2800);
+  }, 2400);
 }
 
-function animateItemRemoval(element) {
-  element.classList.add("is-removing");
-  return new Promise((resolve) => {
-    window.setTimeout(() => {
-      element.remove();
-      resolve();
-    }, 180);
-  });
+function addFriend(name) {
+  const value = name.trim();
+  if (!value) return showToast("请输入好友昵称", true);
+  markDirty();
+  if (state.mode === "advanced") {
+    state.targets.push({ name: value, messages: clone(currentMessages()), extras: {} });
+    selectedTargetIndex = state.targets.length - 1;
+  } else {
+    state.friends.push(value);
+  }
+  elements.friendNameInput.value = "";
+  sync();
+  elements.friendNameInput.focus();
+}
+
+function removeFriend(index) {
+  markDirty();
+  if (state.mode === "advanced") {
+    state.targets.splice(index, 1);
+    selectedTargetIndex = Math.min(selectedTargetIndex, Math.max(0, state.targets.length - 1));
+  } else {
+    state.friends.splice(index, 1);
+  }
+  sync({ animateIn: false });
 }
 
 function addMessage(message) {
-  const messages = [...currentMessages(), message];
-  setCurrentMessages(messages);
-  randomPreviewIndex += 1;
+  markDirty();
+  ensureUiId(message);
+  setCurrentMessages([...currentMessages(), message]);
   sync({ animateIn: true });
 }
 
-function moveItem(items, index, direction) {
-  const nextIndex = index + (direction === "up" ? -1 : 1);
-  if (nextIndex < 0 || nextIndex >= items.length) return items;
+function moveItemTo(items, fromIndex, toIndex) {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) return items;
   const result = [...items];
-  [result[index], result[nextIndex]] = [result[nextIndex], result[index]];
+  const [item] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, item);
   return result;
+}
+
+function animateMessageReorder(mutator) {
+  const firstRects = new Map($$(".message-item").map((item) => [item.dataset.messageId, item.getBoundingClientRect()]));
+  mutator();
+  renderMessages({ animateIn: false });
+  $$(".message-item").forEach((item) => {
+    const first = firstRects.get(item.dataset.messageId);
+    if (!first) return;
+    const last = item.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (!dx && !dy) return;
+    item.style.transform = `translate(${dx}px, ${dy}px)`;
+    item.style.transition = "transform 0s";
+    requestAnimationFrame(() => {
+      item.style.transition = "transform 180ms ease";
+      item.style.transform = "";
+    });
+  });
+}
+
+function markDraggedMessage() {
+  $$(".message-item").forEach((item) => {
+    item.classList.toggle("is-dragging", item.dataset.messageId === draggedMessageId);
+  });
+}
+
+function reorderDraggedMessageOver(target) {
+  if (!target || !draggedMessageId || target.dataset.messageId === draggedMessageId) return;
+  const messages = currentMessages();
+  const from = messages.findIndex((message) => ensureUiId(message) === draggedMessageId);
+  const to = messages.findIndex((message) => ensureUiId(message) === target.dataset.messageId);
+  markDirty();
+  animateMessageReorder(() => setCurrentMessages(moveItemTo(messages, from, to)));
+  markDraggedMessage();
+  saveDraft();
 }
 
 function setComposer(type) {
   composingType = type;
-  $$(".composer-tab").forEach((button) => {
+  $$(".tab").forEach((button) => {
     const active = button.dataset.compose === type;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
   });
   $("#textComposer").hidden = type !== "text";
   $("#stickerComposer").hidden = type !== "sticker";
   $("#randomComposer").hidden = type !== "random";
   if (type === "text") elements.messageInput.focus();
-  if (type === "sticker") elements.stickerSearch.focus();
+  saveDraft();
 }
 
 function switchMode(mode) {
   if (mode === state.mode) return;
+  markDirty();
   if (mode === "advanced") {
     state = convertToAdvanced(state);
   } else {
     if (!canConvertToBasic(state)) {
-      showToast("每位好友的消息不同，无法无损切换到基础模式", true);
+      showToast("每位好友的消息不同，无法无损切换到共享模式", true);
       return;
     }
     state = convertToBasic(state);
   }
   selectedTargetIndex = 0;
-  sync();
+  sync({ animateIn: false });
 }
 
 function applyImportedConfig(raw) {
@@ -326,10 +443,27 @@ function applyImportedConfig(raw) {
     throw new TypeError(`${first.path}：${first.message}`);
   }
   state = result.state;
+  markDirty();
   selectedTargetIndex = 0;
   renderSettings();
-  sync();
+  sync({ animateIn: false });
   showToast("配置导入成功");
+}
+
+async function importFromClipboard() {
+  elements.importError.textContent = "";
+  try {
+    if (!navigator.clipboard?.readText) throw new Error("当前浏览器不支持读取剪切板");
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) throw new Error("剪切板为空");
+    applyImportedConfig(JSON.parse(text));
+    elements.importText.value = "";
+    elements.pasteImportPanel.hidden = true;
+  } catch (error) {
+    elements.importError.textContent = error.message;
+    elements.pasteImportPanel.hidden = false;
+    elements.importText.focus();
+  }
 }
 
 async function readFile(file) {
@@ -347,7 +481,6 @@ async function readFile(file) {
     const text = await file.text();
     if (requestId !== importRequestId) return;
     applyImportedConfig(JSON.parse(text));
-    elements.importDialog.close();
   } catch (error) {
     showToast(`导入失败：${error.message}`, true);
   }
@@ -365,53 +498,156 @@ function downloadConfig(config) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function generateConfig() {
-  if (generating) return;
+function getValidConfig() {
   const config = buildSafeConfig();
   const validation = validateConfig(config);
   if (validation.errors.length) {
-    showToast("请先修正配置错误再生成", true);
-    return;
+    const first = validation.errors[0];
+    showWizardError(`${first.path}：${first.message}`);
+    return null;
   }
-  generating = true;
-  elements.generateButton.classList.add("is-generating");
-  const label = elements.generateButton.querySelector(".btn-label");
-  const original = label.textContent;
-  label.textContent = "正在生成…";
+  elements.wizardError.textContent = "";
+  return config;
+}
+
+function openCompleteDialog() {
+  elements.completeError.textContent = "";
+  if (!getValidConfig()) return;
+  elements.completeDialog.showModal();
+}
+
+function isSmallViewport() {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function getCronExpression(time) {
+  const [hour, minute] = String(time || "").split(":").map(Number);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${minute} ${(hour + 16) % 24} * * *`;
+}
+
+function updateCronOutput() {
+  const time = elements.cronTimeInput.value;
+  const cron = getCronExpression(time);
+  if (!cron) {
+    elements.cronOutput.textContent = "";
+    elements.cronWarning.textContent = "请选择有效时间";
+    return null;
+  }
+  elements.cronOutput.innerHTML = `<code>${escapeHtml(cron)}</code>`;
+  const [hour, minute] = time.split(":").map(Number);
+  const utc8 = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const currentMinutes = utc8.getUTCHours() * 60 + utc8.getUTCMinutes();
+  const selectedMinutes = hour * 60 + minute;
+  elements.cronWarning.textContent = selectedMinutes < currentMinutes
+    ? "设置的时间早于当前，当天任务无法执行，请留意并手动续火花。"
+    : "";
+  return cron;
+}
+
+function openCronDialog() {
+  updateCronOutput();
+  elements.cronDialog.showModal();
+}
+
+async function copyCron() {
+  const cron = updateCronOutput();
+  if (!cron) return;
   try {
-    await new Promise((resolve) => window.setTimeout(resolve, 620));
-    downloadConfig(config);
-    showToast("配置生成成功！已下载 config.json");
-  } finally {
-    label.textContent = original;
-    elements.generateButton.classList.remove("is-generating");
-    generating = false;
+    await navigator.clipboard.writeText(cron);
+    showToast("已复制 Cron 表达式");
+  } catch (error) {
+    elements.cronWarning.textContent = error.message || "复制失败";
   }
 }
 
-async function removeMessageWithAnimation(article) {
-  await animateItemRemoval(article);
-  const messages = currentMessages();
-  const index = Number(article.dataset.messageIndex);
-  if (index >= 0 && index < messages.length) {
-    setCurrentMessages(messages.filter((_, itemIndex) => itemIndex !== index));
-    sync({ animateIn: false });
+async function copyConfig() {
+  const config = getValidConfig();
+  if (!config) return;
+  try {
+    await navigator.clipboard.writeText(formatConfig(config));
+    markSaved();
+    showToast("已复制配置");
+  } catch (error) {
+    elements.completeError.textContent = error.message;
   }
+}
+
+function normalizeInterval(changed) {
+  markDirty();
+  let min = Number(elements.intervalMinInput.value);
+  let max = Number(elements.intervalMaxInput.value);
+  if (min > max) {
+    if (changed === "min") max = min;
+    else min = max;
+  }
+  elements.intervalMinInput.value = min;
+  elements.intervalMaxInput.value = max;
+  renderIntervalSlider();
+  sync({ animateIn: false });
+}
+
+function isFileDrag(event) {
+  return [...(event.dataTransfer?.types || [])].includes("Files");
+}
+
+function clearConfig() {
+  state = createInitialState();
+  selectedTargetIndex = 0;
+  renderSettings();
+  elements.pasteImportPanel.hidden = true;
+  elements.importText.value = "";
+  elements.importError.textContent = "";
+  elements.wizardError.textContent = "";
+  sync({ animateIn: false });
+  markSaved();
+  showToast("已清空配置");
 }
 
 function bindEvents() {
-  elements.friendsInput.addEventListener("input", () => {
-    state.friends = parseFriends(elements.friendsInput.value);
-    sync({ renderTargetEditors: false, animateIn: false });
+  elements.resetConfigButton.addEventListener("click", () => {
+    elements.clearDialog.showModal();
   });
-  $("#cleanFriendsButton").addEventListener("click", () => {
-    state.friends = [...new Set(parseFriends(elements.friendsInput.value))];
-    sync();
-    showToast("好友列表已清理");
+  elements.confirmClearButton.addEventListener("click", () => {
+    elements.clearDialog.close();
+    clearConfig();
   });
-  elements.messageInput.addEventListener("input", () => { elements.characterCount.textContent = `${elements.messageInput.value.length} / 500`; });
+  elements.importFileButton.addEventListener("click", () => elements.fileInput.click());
+  elements.importClipboardButton.addEventListener("click", importFromClipboard);
+  elements.cronButton.addEventListener("click", openCronDialog);
+  elements.cronTimeInput.addEventListener("input", updateCronOutput);
+  elements.copyCronButton.addEventListener("click", copyCron);
+  elements.completeButton.addEventListener("click", openCompleteDialog);
+  elements.copyConfigButton.addEventListener("click", copyConfig);
+  elements.downloadConfigButton.addEventListener("click", () => {
+    const config = getValidConfig();
+    if (!config) return;
+    downloadConfig(config);
+    markSaved();
+    showToast("已下载 config.json");
+  });
+
+  $$("[data-switch-mode]").forEach((button) => button.addEventListener("click", () => switchMode(button.dataset.switchMode)));
+  elements.addFriendButton = $("#addFriendButton");
+  elements.addFriendButton.addEventListener("click", () => addFriend(elements.friendNameInput.value));
+  elements.friendNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      elements.addFriendButton.click();
+    }
+  });
+  elements.friendList.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    if (button.dataset.friendSelect !== undefined && state.mode === "advanced") {
+      selectedTargetIndex = Number(button.dataset.friendSelect);
+      sync({ animateIn: false });
+    }
+    if (button.dataset.friendRemove !== undefined) removeFriend(Number(button.dataset.friendRemove));
+  });
+
   elements.messageInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter") {
       event.preventDefault();
       $("#addTextButton").click();
     }
@@ -421,7 +657,6 @@ function bindEvents() {
     if (!value) return showToast("请先输入消息内容", true);
     addMessage({ type: "text", value, sourceKey: "value", extras: {} });
     elements.messageInput.value = "";
-    elements.characterCount.textContent = "0 / 500";
     elements.messageInput.focus();
   });
   $("#addRandomButton").addEventListener("click", () => {
@@ -430,88 +665,89 @@ function bindEvents() {
     addMessage({ type: "random", choices, extras: {} });
     elements.randomChoicesInput.value = "";
   });
-  $$(".composer-tab").forEach((button) => button.addEventListener("click", () => setComposer(button.dataset.compose)));
+  $$(".tab").forEach((button) => button.addEventListener("click", () => setComposer(button.dataset.compose)));
   elements.stickerGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-sticker]");
     if (!button) return;
     addMessage({ type: "sticker", value: button.dataset.sticker, sourceKey: "value", extras: {} });
     showToast(`已添加原生表情“${button.dataset.sticker}”`);
   });
-  elements.stickerSearch.addEventListener("input", renderStickerGrid);
+
   elements.messageList.addEventListener("click", (event) => {
-    const action = event.target.closest("button");
-    if (!action) return;
-    const messages = currentMessages();
-    const index = Number(action.dataset.messageIndex ?? action.dataset.messageRemove ?? action.dataset.messageDuplicate);
-    if (action.dataset.messageMove) {
-      setCurrentMessages(moveItem(messages, index, action.dataset.messageMove));
-      sync({ animateIn: false });
-    }
-    if (action.dataset.messageRemove !== undefined) {
-      const article = action.closest(".message-item");
-      removeMessageWithAnimation(article);
-    }
-    if (action.dataset.messageDuplicate !== undefined) {
-      const copy = clone(messages[index]);
-      const next = [...messages];
-      next.splice(index + 1, 0, copy);
-      setCurrentMessages(next);
-      sync({ animateIn: true });
-    }
+    const removeButton = event.target.closest("[data-message-remove]");
+    if (!removeButton) return;
+    const id = removeButton.dataset.messageRemove;
+    markDirty();
+    setCurrentMessages(currentMessages().filter((message) => ensureUiId(message) !== id));
+    renderMessages({ animateIn: false });
+    renderValidation(buildSafeConfig());
+    saveDraft();
   });
-  elements.advancedTargetsEditor.addEventListener("input", (event) => {
-    if (event.target.dataset.targetName === undefined) return;
-    state.targets[Number(event.target.dataset.targetName)].name = event.target.value;
-    sync({ renderTargetEditors: false, animateIn: false });
-  });
-  elements.advancedTargetsEditor.addEventListener("click", (event) => {
-    const button = event.target.closest("button");
-    if (!button) return;
-    if (button.id === "addTargetButton") {
-      state.targets.push({ name: `好友 ${state.targets.length + 1}`, messages: clone(currentMessages()), extras: {} });
-      selectedTargetIndex = state.targets.length - 1;
-      sync({ animateIn: false });
-    } else if (button.dataset.targetSelect !== undefined) {
-      selectedTargetIndex = Number(button.dataset.targetSelect);
-      sync({ animateIn: false });
-    } else if (button.dataset.targetRemove !== undefined) {
-      state.targets.splice(Number(button.dataset.targetRemove), 1);
-      selectedTargetIndex = Math.min(selectedTargetIndex, Math.max(0, state.targets.length - 1));
-      sync({ animateIn: false });
-    } else if (button.dataset.targetMove) {
-      const index = Number(button.dataset.targetIndex);
-      state.targets = moveItem(state.targets, index, button.dataset.targetMove);
-      selectedTargetIndex = index + (button.dataset.targetMove === "up" ? -1 : 1);
-      sync({ animateIn: false });
+  elements.messageList.addEventListener("dragstart", (event) => {
+    const handle = event.target.closest(".drag-handle");
+    if (!handle || isSmallViewport()) {
+      event.preventDefault();
+      return;
     }
+    const item = event.target.closest(".message-item");
+    if (!item) return;
+    draggedMessageId = item.dataset.messageId;
+    markDraggedMessage();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", draggedMessageId);
+  });
+  elements.messageList.addEventListener("dragover", (event) => {
+    if (!draggedMessageId || isSmallViewport()) return;
+    event.preventDefault();
+    const target = event.target.closest(".message-item");
+    reorderDraggedMessageOver(target);
+  });
+  elements.messageList.addEventListener("dragend", () => {
+    draggedMessageId = null;
+    renderMessages({ animateIn: false });
+  });
+  elements.messageList.addEventListener("mousedown", (event) => {
+    const handle = event.target.closest(".drag-handle");
+    if (!handle || isSmallViewport()) return;
+    const item = handle.closest(".message-item");
+    if (!item) return;
+    event.preventDefault();
+    draggedMessageId = item.dataset.messageId;
+    markDraggedMessage();
+  });
+  document.addEventListener("mousemove", (event) => {
+    if (!draggedMessageId) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".message-item");
+    reorderDraggedMessageOver(target);
+  });
+  document.addEventListener("mouseup", () => {
+    if (!draggedMessageId) return;
+    draggedMessageId = null;
+    renderMessages({ animateIn: false });
   });
 
-  [elements.taskIdInput, elements.timezoneInput, elements.intervalMinInput, elements.intervalMaxInput, elements.retryInput, elements.timeoutInput].forEach((input) => input.addEventListener("input", () => sync({ animateIn: false })));
-  [elements.continueToggle, elements.duplicateToggle].forEach((input) => input.addEventListener("change", () => sync({ animateIn: false })));
-  $("#resetSettingsButton").addEventListener("click", () => {
-    state.settings = clone(CONFIG_DEFAULTS);
-    renderSettings();
+  [elements.taskIdInput, elements.timezoneInput, elements.retryInput, elements.timeoutInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      markDirty();
+      sync({ animateIn: false });
+    });
+  });
+  elements.intervalMinInput.addEventListener("input", () => normalizeInterval("min"));
+  elements.intervalMaxInput.addEventListener("input", () => normalizeInterval("max"));
+  [elements.continueToggle, elements.duplicateToggle].forEach((input) => input.addEventListener("change", () => {
+    markDirty();
     sync({ animateIn: false });
-    showToast("已恢复默认运行设置");
-  });
-  elements.generateButton.addEventListener("click", generateConfig);
-  $("#importButton").addEventListener("click", () => {
-    elements.importError.textContent = "";
-    elements.importDialog.showModal();
-  });
+  }));
+
   $("#confirmImportButton").addEventListener("click", () => {
     try {
       if (!elements.importText.value.trim()) throw new Error("请粘贴 JSON 或选择文件");
       applyImportedConfig(JSON.parse(elements.importText.value));
-      elements.importDialog.close();
       elements.importText.value = "";
+      elements.pasteImportPanel.hidden = true;
     } catch (error) {
       elements.importError.textContent = error.message;
     }
-  });
-  $("#importDropzone").addEventListener("click", () => elements.fileInput.click());
-  $("#importDropzone").addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); elements.fileInput.click(); }
   });
   elements.fileInput.addEventListener("change", () => {
     const [file] = elements.fileInput.files;
@@ -520,40 +756,32 @@ function bindEvents() {
   });
 
   let dragDepth = 0;
-  window.addEventListener("dragenter", (event) => { event.preventDefault(); dragDepth += 1; elements.dropOverlay.hidden = false; });
-  window.addEventListener("dragover", (event) => event.preventDefault());
-  window.addEventListener("dragleave", () => { dragDepth -= 1; if (dragDepth <= 0) { dragDepth = 0; elements.dropOverlay.hidden = true; } });
-  window.addEventListener("drop", (event) => { event.preventDefault(); dragDepth = 0; elements.dropOverlay.hidden = true; readFile(event.dataTransfer.files[0]); });
-
-  $("#customStickerButton").addEventListener("click", () => { elements.stickerError.textContent = ""; elements.stickerDialog.showModal(); });
-  $("#saveStickerButton").addEventListener("click", () => {
-    const name = $("#customStickerName").value.trim();
-    const label = $("#customStickerLabel").value.trim() || name;
-    const category = $("#customStickerCategory").value.trim();
-    const fallbackIndex = $("#customStickerIndex").valueAsNumber;
-    if (!name || !Number.isInteger(fallbackIndex) || fallbackIndex < 0) {
-      elements.stickerError.textContent = "名称不能为空，备用序号必须是非负整数。";
-      return;
+  window.addEventListener("dragenter", (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    dragDepth += 1;
+    elements.dropOverlay.hidden = false;
+  });
+  window.addEventListener("dragover", (event) => {
+    if (isFileDrag(event)) event.preventDefault();
+  });
+  window.addEventListener("dragleave", (event) => {
+    if (!isFileDrag(event)) return;
+    dragDepth -= 1;
+    if (dragDepth <= 0) {
+      dragDepth = 0;
+      elements.dropOverlay.hidden = true;
     }
-    state.stickers[name] = { label, ...(category ? { category } : {}), fallback_index: fallbackIndex };
-    state.preservedStickerNames = [...new Set([...(state.preservedStickerNames || []), name])];
-    addMessage({ type: "sticker", value: name, sourceKey: "value", extras: {} });
-    elements.stickerDialog.close();
   });
-  $("#themeButton").addEventListener("click", () => {
-    const explicitTheme = document.documentElement.dataset.theme;
-    const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = explicitTheme ? "system" : systemIsDark ? "light" : "dark";
-    if (next === "system") delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = next;
-    const label = next === "system"
-      ? "当前跟随系统，点击手动切换主题"
-      : `当前为${next === "dark" ? "深色" : "浅色"}主题，点击恢复跟随系统`;
-    $("#themeButton").setAttribute("aria-label", label);
-    $("#themeButton").title = label;
-    try { localStorage.setItem("config-theme", next); } catch {}
+  window.addEventListener("drop", (event) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    dragDepth = 0;
+    elements.dropOverlay.hidden = true;
+    readFile(event.dataTransfer.files[0]);
   });
-  const composerTabs = $$(".composer-tab");
+
+  const composerTabs = $$(".tab");
   composerTabs.forEach((button, index) => button.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -563,16 +791,23 @@ function bindEvents() {
     composerTabs[nextIndex].focus();
     setComposer(composerTabs[nextIndex].dataset.compose);
   }));
+
+  window.addEventListener("beforeunload", (event) => {
+    if (!hasUnsavedChanges) return;
+    event.preventDefault();
+    event.returnValue = true;
+  });
 }
 
 function initialize() {
-  try {
-    const theme = localStorage.getItem("config-theme");
-    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
-  } catch {}
+  const restored = loadDraft();
   renderSettings();
+  setComposer(composingType);
   bindEvents();
   sync({ animateIn: false });
+  isInitializing = false;
+  markSaved();
+  if (restored) showToast("已恢复浏览器缓存配置");
 }
 
 initialize();
