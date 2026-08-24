@@ -3,228 +3,179 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="在线生成抖音自动续火花配置文件,纯浏览器运行,不上传任何数据">
-  <meta name="color-scheme" content="light dark">
-  <title>火花配置台 · 抖音续火花配置生成器</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2325F4EE'/%3E%3Cstop offset='1' stop-color='%23FE2C55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='24' height='24' rx='6' fill='url(%23g)'/%3E%3Cpath d='M13 4.5 7 14h4l-1 5.5L16.5 9h-4L13 4.5Z' fill='white'/%3E%3C/svg%3E">
+  <meta name="description" content="在浏览器本地生成抖音自动续火花配置文件">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ffffff">
+  <title>火花配置台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230a0a0a'/%3E%3Cpath d='M13 4.5 7 14h4l-1 5.5L16.5 9h-4L13 4.5Z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="page-glow" aria-hidden="true"></div>
-  <a class="skip-link" href="#main">跳到配置内容</a>
+  <a class="skip-link" href="#editorGrid">跳到配置内容</a>
 
-  <header class="topbar">
-    <a class="brand" href="#" aria-label="火花配置台首页">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2Z"/></svg>
-      </span>
-      <span class="brand-text"><strong>火花配置台</strong><small>Douyin Config Studio</small></span>
-    </a>
-    <div class="topbar-actions">
-      <button class="icon-button" id="themeButton" type="button" aria-label="切换深浅主题" title="当前跟随系统，点击切换主题">
-        <svg class="theme-icon theme-icon-system" aria-hidden="true" width="19" height="19"><use href="#icon-monitor"></use></svg>
-        <svg class="theme-icon theme-icon-light" aria-hidden="true" width="19" height="19"><use href="#icon-sun"></use></svg>
-        <svg class="theme-icon theme-icon-dark" aria-hidden="true" width="19" height="19"><use href="#icon-moon"></use></svg>
-      </button>
-      <button class="button button-secondary header-action" id="importButton" type="button">
-        <svg aria-hidden="true" width="17" height="17"><use href="#icon-upload"></use></svg><span>导入配置</span>
-      </button>
-    </div>
-  </header>
-
-  <main id="main" class="page">
-    <section class="hero" aria-labelledby="heroTitle">
-      <div class="hero-visual" aria-hidden="true">
-        <svg viewBox="0 0 120 120" class="hero-svg">
-          <defs>
-            <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#25F4EE"/>
-              <stop offset="1" stop-color="#FE2C55"/>
-            </linearGradient>
-          </defs>
-          <g class="hero-ring hero-ring-outer">
-            <circle cx="60" cy="60" r="54"/>
-          </g>
-          <g class="hero-ring hero-ring-inner">
-            <circle cx="60" cy="60" r="41"/>
-          </g>
-          <circle class="hero-core" cx="60" cy="60" r="28"/>
-          <path class="hero-sparks" d="M60 28v-9M60 101v-9M28 60h-9M101 60h-9M37.4 37.4 31 31M89 89l-6.4-6.4M82.6 37.4 89 31M31 89l6.4-6.4"/>
-          <circle class="hero-core" cx="60" cy="60" r="6"/>
-        </svg>
-      </div>
-      <p class="hero-eyebrow">DOUYIN CONFIG GENERATOR</p>
-      <h1 id="heroTitle">在线生成抖音<span class="gradient-text">自动续火花</span>配置文件</h1>
-      <p class="hero-sub" id="heroSub">填写好友和消息，一键生成可用的配置 JSON —— 全程在浏览器本地完成，不上传任何数据。</p>
-      <div class="hero-actions">
-        <a class="button button-primary button-lg" href="#generateSection"><svg aria-hidden="true" width="18" height="18"><use href="#icon-bolt"></use></svg>开始配置</a>
-        <a class="button button-secondary button-lg" href="#friendsSection"><svg aria-hidden="true" width="18" height="18"><use href="#icon-shield"></use></svg>本地生成 · 无需登录</a>
-      </div>
-      <div class="hero-features">
-        <span><svg aria-hidden="true" width="14" height="14"><use href="#icon-shield"></use></svg>纯本地处理</span>
-        <span><svg aria-hidden="true" width="14" height="14"><use href="#icon-download"></use></svg>一键下载</span>
-        <span><svg aria-hidden="true" width="14" height="14"><use href="#icon-file"></use></svg>支持离线使用</span>
-      </div>
-    </section>
-
-    <section class="config-area" aria-label="配置表单">
-      <section class="card" id="friendsSection" aria-labelledby="friendsTitle">
-        <div class="card-head">
-          <div class="card-icon" aria-hidden="true"><svg width="19" height="19"><use href="#icon-users"></use></svg></div>
-          <div>
-            <h2 id="friendsTitle">好友配置</h2>
-            <p>设置要发送火花的好友，每行一个昵称，顺序即发送顺序。</p>
-          </div>
-          <span class="count-badge" id="friendCount">1 位好友</span>
-        </div>
-
-        <div id="basicFriendsEditor">
-          <label class="field-label" for="friendsInput">好友昵称 <span aria-hidden="true">*</span></label>
-          <textarea id="friendsInput" rows="4" aria-describedby="friendsHelp" spellcheck="false">好友昵称</textarea>
-          <div class="input-footer">
-            <span>支持换行或英文逗号分隔</span>
-            <button class="text-button" type="button" id="cleanFriendsButton">去重并清理</button>
-          </div>
-        </div>
-        <div id="advancedTargetsEditor" class="target-editor" hidden></div>
-      </section>
-
-      <section class="card" id="messagesSection" aria-labelledby="messagesTitle">
-        <div class="card-head">
-          <div class="card-icon" aria-hidden="true"><svg width="19" height="19"><use href="#icon-message"></use></svg></div>
-          <div>
-            <h2 id="messagesTitle">消息配置</h2>
-            <p>消息按列表顺序逐条发送，可混合文字和原生表情。</p>
-          </div>
-          <span class="count-badge" id="messageCount">2 条消息</span>
-        </div>
-
-        <div class="composer-card">
-          <div class="composer-tabs" role="tablist" aria-label="新消息类型">
-            <button class="composer-tab is-active" type="button" role="tab" aria-selected="true" data-compose="text">
-              <svg aria-hidden="true" width="17" height="17"><use href="#icon-message"></use></svg>文字
-            </button>
-            <button class="composer-tab" type="button" role="tab" aria-selected="false" data-compose="sticker">
-              <svg aria-hidden="true" width="17" height="17"><use href="#icon-smile"></use></svg>原生表情
-            </button>
-            <button class="composer-tab" type="button" role="tab" aria-selected="false" data-compose="random">
-              <svg aria-hidden="true" width="17" height="17"><use href="#icon-shuffle"></use></svg>随机
-            </button>
-          </div>
-
-          <div class="compose-panel" id="textComposer" role="tabpanel">
-            <label class="field-label" for="messageInput">消息内容</label>
-            <div class="message-input-row">
-              <textarea id="messageInput" rows="2" maxlength="500" placeholder="输入要发送的消息，例如：今天也要开心呀"></textarea>
-              <button class="send-add-button" id="addTextButton" type="button" aria-label="添加文字消息" title="添加文字消息">
-                <svg aria-hidden="true" width="20" height="20"><use href="#icon-send"></use></svg>
-              </button>
-            </div>
-            <div class="input-footer"><span>Enter 添加，Shift + Enter 换行</span><span id="characterCount">0 / 500</span></div>
-          </div>
-
-          <div class="compose-panel" id="stickerComposer" role="tabpanel" hidden>
-            <div class="sticker-toolbar">
-              <div class="search-box"><svg aria-hidden="true" width="17" height="17"><use href="#icon-search"></use></svg><label class="sr-only" for="stickerSearch">搜索表情</label><input id="stickerSearch" type="search" placeholder="搜索原生表情"></div>
-              <button class="button button-quiet" id="customStickerButton" type="button"><svg aria-hidden="true" width="17" height="17"><use href="#icon-plus"></use></svg>自定义映射</button>
-            </div>
-            <div class="sticker-grid" id="stickerGrid" aria-label="原生表情选项"></div>
-            <p class="panel-note"><svg aria-hidden="true" width="15" height="15"><use href="#icon-info"></use></svg>预览符号仅用于识别；实际运行时发送的是抖音原生表情。</p>
-          </div>
-
-          <div class="compose-panel" id="randomComposer" role="tabpanel" hidden>
-            <div class="random-builder">
-              <p>创建一个随机消息组，运行时从候选文字中随机选择一条。</p>
-              <label class="field-label" for="randomChoicesInput">候选文字</label>
-              <textarea id="randomChoicesInput" rows="4" placeholder="每行一条候选消息"></textarea>
-              <button class="button button-primary" id="addRandomButton" type="button"><svg aria-hidden="true" width="17" height="17"><use href="#icon-shuffle"></use></svg>添加随机消息</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="message-list-heading">
-          <h3>发送队列</h3>
-          <span>使用箭头调整顺序</span>
-        </div>
-        <div class="message-list" id="messageList"></div>
-      </section>
-
-      <section class="card" id="settingsSection" aria-labelledby="settingsTitle">
-        <div class="card-head">
-          <div class="card-icon" aria-hidden="true"><svg width="19" height="19"><use href="#icon-settings"></use></svg></div>
-          <div>
-            <h2 id="settingsTitle">发送设置</h2>
-            <p>通常保持默认即可，需要时再调整。</p>
-          </div>
-          <button class="text-button" id="resetSettingsButton" type="button">恢复默认</button>
-        </div>
-        <fieldset class="field interval-field primary-setting"><legend>好友间发送间隔</legend><div><label><span>最短</span><input id="intervalMinInput" type="number" inputmode="decimal" min="0" step="0.5"></label><span class="range-separator">至</span><label><span>最长</span><input id="intervalMaxInput" type="number" inputmode="decimal" min="0" step="0.5"></label><span>秒</span></div></fieldset>
-        <div class="toggle-list">
-          <label class="toggle-row"><span><strong>失败后继续</strong><small>单个好友发送失败时继续处理后续好友</small></span><input id="continueToggle" type="checkbox"><i aria-hidden="true"></i></label>
-          <label class="toggle-row"><span><strong>防止重复发送</strong><small>按任务、日期、好友和消息记录发送历史</small></span><input id="duplicateToggle" type="checkbox"><i aria-hidden="true"></i></label>
-        </div>
-        <details class="advanced-settings">
-          <summary><span><svg aria-hidden="true" width="17" height="17"><use href="#icon-code"></use></svg><strong>高级设置</strong></span><small>任务标识、时区、重试与超时</small></summary>
-          <div class="settings-grid advanced-settings-body">
-            <label class="field"><span>任务 ID</span><input id="taskIdInput" type="text" autocomplete="off"></label>
-            <label class="field"><span>时区</span><input id="timezoneInput" type="text" autocomplete="off"></label>
-            <label class="field"><span>打开好友重试次数</span><input id="retryInput" type="number" inputmode="numeric" min="0" step="1"></label>
-            <label class="field"><span>打开好友超时</span><div class="input-suffix"><input id="timeoutInput" type="number" inputmode="decimal" min="0.1" step="0.5"><span>秒</span></div></label>
-          </div>
-        </details>
-      </section>
-    </section>
-
-    <section class="card generate-card" id="generateSection" aria-labelledby="generateTitle">
+  <main class="app-shell">
+    <header class="app-header">
       <div>
-        <div class="card-icon" aria-hidden="true"><svg width="19" height="19"><use href="#icon-bolt"></use></svg></div>
-        <h2 id="generateTitle">生成配置</h2>
-        <p>点击按钮生成 JSON 配置文件并下载，不会上传任何数据。</p>
+        <h1>DOUYIN_CONFIG</h1>
+        <p>配置好友、消息和发送参数</p>
       </div>
-      <div class="generate-actions">
-        <span class="generate-hint" id="generateHint">
-          <svg aria-hidden="true" width="14" height="14"><use href="#icon-shield"></use></svg>
-          <span>当前配置有效，可安全生成</span>
+      <div class="toolbar" aria-label="配置操作">
+        <button class="button button-outline" id="resetConfigButton" type="button">清空</button>
+        <button class="button button-outline" id="importFileButton" type="button">导入配置</button>
+        <span class="tooltip-wrap">
+          <button class="button button-outline" id="importClipboardButton" type="button" aria-describedby="clipboardTooltip">剪切板获取</button>
+          <span class="tooltip" id="clipboardTooltip" role="tooltip">需要提前复制配置</span>
         </span>
-        <button class="button button-primary button-lg" id="generateButton" type="button">
-          <svg class="btn-icon btn-icon-static" aria-hidden="true" width="18" height="18"><use href="#icon-bolt"></use></svg>
-          <svg class="btn-icon btn-icon-loading" aria-hidden="true" width="18" height="18"><use href="#icon-loader"></use></svg>
-          <span class="btn-label">生成并下载配置</span>
-        </button>
+        <button class="button button-outline" id="cronButton" type="button">Cron</button>
+        <button class="button button-primary complete-action" id="completeButton" type="button"><svg class="complete-action-icon" aria-hidden="true" width="18" height="18"><use href="#icon-check-filled"></use></svg><span>完成</span></button>
       </div>
+    </header>
+
+    <section class="import-panel" id="pasteImportPanel" hidden>
+      <label for="importText">粘贴 JSON</label>
+      <div class="import-row">
+        <textarea id="importText" name="import-json" rows="4" autocomplete="off" spellcheck="false" placeholder="粘贴 config.json 内容…"></textarea>
+        <button class="button button-primary" id="confirmImportButton" type="button">导入</button>
+      </div>
+      <p class="field-error" id="importError" role="alert"></p>
     </section>
 
-    <footer class="page-footer">
-      <p>火花配置台 · 纯浏览器本地生成，不保存任何数据</p>
-    </footer>
+    <div class="editor-grid" id="editorGrid">
+      <section class="panel panel-contacts" aria-labelledby="contactsTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="contactsTitle">好友</h2>
+            <p id="friendCount">0 位好友</p>
+          </div>
+          <div class="segmented" role="group" aria-label="配置模式">
+            <button class="segment is-active" type="button" data-switch-mode="basic" aria-pressed="true">共享</button>
+            <button class="segment" type="button" data-switch-mode="advanced" aria-pressed="false">独立</button>
+          </div>
+        </div>
+
+        <div class="add-row">
+          <input id="friendNameInput" name="friend-name" type="text" autocomplete="off">
+          <button class="button button-primary" id="addFriendButton" type="button">添加</button>
+        </div>
+        <div class="friend-list" id="friendList" aria-label="好友列表"></div>
+      </section>
+
+      <section class="panel panel-messages" aria-labelledby="messagesTitle">
+        <div class="panel-header">
+          <div>
+            <h2 id="messagesTitle">消息</h2>
+            <p id="messageCount">0 条消息</p>
+          </div>
+          <div class="tabs" role="tablist" aria-label="消息类型">
+            <button class="tab is-active" id="textTab" type="button" role="tab" aria-selected="true" aria-controls="textComposer" data-compose="text">文字</button>
+            <button class="tab" id="stickerTab" type="button" role="tab" aria-selected="false" aria-controls="stickerComposer" data-compose="sticker" tabindex="-1">表情</button>
+            <button class="tab" id="randomTab" type="button" role="tab" aria-selected="false" aria-controls="randomComposer" data-compose="random" tabindex="-1">随机</button>
+          </div>
+        </div>
+
+        <div class="compose-panel" id="textComposer" role="tabpanel" aria-labelledby="textTab">
+          <label for="messageInput">消息内容</label>
+          <div class="add-row">
+            <input id="messageInput" name="message" type="text" autocomplete="off" placeholder="输入消息内容">
+            <button class="button button-primary" id="addTextButton" type="button">添加</button>
+          </div>
+        </div>
+
+        <div class="compose-panel" id="stickerComposer" role="tabpanel" aria-labelledby="stickerTab" hidden>
+          <label>原生表情</label>
+          <div class="sticker-grid" id="stickerGrid" aria-label="原生表情选项"></div>
+        </div>
+
+        <div class="compose-panel" id="randomComposer" role="tabpanel" aria-labelledby="randomTab" hidden>
+          <label for="randomChoicesInput">候选消息</label>
+          <textarea id="randomChoicesInput" name="random-choices" rows="4" autocomplete="off" placeholder="每行一条候选消息"></textarea>
+          <button class="button button-primary" id="addRandomButton" type="button">添加随机消息</button>
+        </div>
+
+        <div class="message-list" id="messageList" aria-label="消息列表"></div>
+      </section>
+
+      <aside class="side-stack">
+        <section class="panel panel-settings" aria-labelledby="settingsTitle">
+          <div class="panel-header">
+            <div>
+              <h2 id="settingsTitle">高级设置</h2>
+              <p>发送间隔与任务选项</p>
+            </div>
+          </div>
+
+          <fieldset class="field-group interval-field">
+            <legend>好友间发送间隔</legend>
+            <div class="range-readout"><span id="intervalMinValue">3</span><span id="intervalMaxValue">8</span></div>
+            <div class="range-slider" id="intervalSlider">
+              <div class="range-track" aria-hidden="true"><span id="intervalRangeFill"></span></div>
+              <input id="intervalMinInput" name="interval-min" type="range" min="0" max="10" step="0.5" value="3" aria-label="最短发送间隔">
+              <input id="intervalMaxInput" name="interval-max" type="range" min="0" max="10" step="0.5" value="8" aria-label="最长发送间隔">
+            </div>
+          </fieldset>
+
+          <div class="switch-list">
+            <label class="switch-row"><span>失败后继续</span><input id="continueToggle" name="continue-on-error" type="checkbox"><i aria-hidden="true"></i></label>
+            <label class="switch-row"><span>防止重复发送</span><input id="duplicateToggle" name="prevent-duplicates" type="checkbox"><i aria-hidden="true"></i></label>
+          </div>
+
+          <div class="settings-grid">
+            <label>任务 ID<input id="taskIdInput" name="task-id" type="text" autocomplete="off" spellcheck="false"></label>
+            <label>时区<input id="timezoneInput" name="timezone" type="text" autocomplete="off" spellcheck="false"></label>
+            <label>重试次数<input id="retryInput" name="target-open-retries" type="number" inputmode="numeric" min="0" step="1" autocomplete="off"></label>
+            <label>超时秒数<input id="timeoutInput" name="target-open-timeout" type="number" inputmode="decimal" min="0.1" step="0.5" autocomplete="off"></label>
+          </div>
+        </section>
+
+        <section class="panel panel-status" aria-labelledby="statusTitle">
+          <div class="panel-header">
+            <div>
+              <h2 id="statusTitle">检查</h2>
+              <p id="generateHint" aria-live="polite"><svg aria-hidden="true" width="16" height="16"><use href="#icon-shield"></use></svg><span>配置有效</span></p>
+            </div>
+          </div>
+          <div class="validation-list" id="validationList"></div>
+          <p class="field-error" id="wizardError" role="alert" aria-live="polite"></p>
+        </section>
+      </aside>
+    </div>
   </main>
 
-  <input id="fileInput" type="file" accept="application/json,.json" hidden>
-  <div class="drop-overlay" id="dropOverlay" hidden><div><svg aria-hidden="true" width="36" height="36"><use href="#icon-upload"></use></svg><strong>释放文件以导入配置</strong><span>仅支持 JSON 文件</span></div></div>
+  <input id="fileInput" name="config-file" type="file" accept="application/json,.json" aria-label="选择 JSON 配置文件" hidden>
+  <div class="drop-overlay" id="dropOverlay" hidden><div><svg aria-hidden="true" width="28" height="28"><use href="#icon-upload"></use></svg><strong>释放文件以导入</strong></div></div>
 
-  <dialog id="importDialog" class="modal">
-    <form method="dialog" class="modal-card">
-      <header><div><p class="eyebrow">IMPORT</p><h2>导入现有配置</h2></div><button class="icon-button" value="cancel" aria-label="关闭导入窗口"><svg aria-hidden="true" width="19" height="19"><use href="#icon-close"></use></svg></button></header>
-      <div class="import-dropzone" id="importDropzone" tabindex="0" role="button" aria-label="选择或拖入 JSON 文件">
-        <svg aria-hidden="true" width="26" height="26"><use href="#icon-file"></use></svg><strong>拖入 config.json</strong><span>或点击选择文件</span>
+  <dialog id="completeDialog" class="modal">
+    <form method="dialog" class="modal-content modal-small">
+      <header><h2>完成配置</h2><button class="icon-button" value="cancel" aria-label="关闭完成窗口"><svg aria-hidden="true" width="18" height="18"><use href="#icon-close"></use></svg></button></header>
+      <div class="modal-actions">
+        <button class="button button-outline" id="copyConfigButton" type="button"><svg aria-hidden="true" width="18" height="18"><use href="#icon-copy"></use></svg>复制</button>
+        <button class="button button-primary" id="downloadConfigButton" type="button"><svg aria-hidden="true" width="18" height="18"><use href="#icon-download"></use></svg>下载</button>
       </div>
-      <div class="separator"><span>或者粘贴 JSON</span></div>
-      <label class="sr-only" for="importText">粘贴 JSON 配置</label>
-      <textarea id="importText" rows="10" placeholder="{&#10;  &quot;friends&quot;: [&quot;好友昵称&quot;],&#10;  &quot;messages&quot;: [...]&#10;}"></textarea>
-      <p class="dialog-error" id="importError" role="alert"></p>
-      <footer><button class="button button-secondary" value="cancel">取消</button><button class="button button-primary" id="confirmImportButton" type="button">检查并导入</button></footer>
+      <p class="dialog-note">使用GitHub Actions方案推荐下载 <code>config.json</code> 并妥善保管，方便以后编辑</p>
+      <p class="field-error" id="completeError" role="alert"></p>
     </form>
   </dialog>
 
-  <dialog id="stickerDialog" class="modal">
-    <form method="dialog" class="modal-card modal-small">
-      <header><div><p class="eyebrow">STICKER MAP</p><h2>自定义原生表情</h2></div><button class="icon-button" value="cancel" aria-label="关闭"><svg aria-hidden="true" width="19" height="19"><use href="#icon-close"></use></svg></button></header>
-      <label class="field"><span>配置名称</span><input id="customStickerName" type="text" placeholder="例如：比心"></label>
-      <label class="field"><span>抖音面板名称</span><input id="customStickerLabel" type="text" placeholder="程序优先按此名称查找"></label>
-      <label class="field"><span>分类</span><input id="customStickerCategory" type="text" value="常用"></label>
-      <label class="field"><span>备用序号</span><input id="customStickerIndex" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
-      <p class="dialog-error" id="stickerError" role="alert"></p>
-      <footer><button class="button button-secondary" value="cancel">取消</button><button class="button button-primary" id="saveStickerButton" type="button">保存并添加</button></footer>
+  <dialog id="clearDialog" class="modal">
+    <form method="dialog" class="modal-content modal-small">
+      <header><h2>清空配置</h2><button class="icon-button" value="cancel" aria-label="关闭清空确认窗口"><svg aria-hidden="true" width="18" height="18"><use href="#icon-close"></use></svg></button></header>
+      <p class="dialog-note">确认清空当前页面中的好友、消息和参数？</p>
+      <div class="modal-actions">
+        <button class="button button-outline" value="cancel" type="submit">取消</button>
+        <button class="button button-primary" id="confirmClearButton" type="button">清空</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cronDialog" class="modal">
+    <form method="dialog" class="modal-content modal-small">
+      <header><h2>Cron 生成器</h2><button class="icon-button" value="cancel" aria-label="关闭 Cron 生成器"><svg aria-hidden="true" width="18" height="18"><use href="#icon-close"></use></svg></button></header>
+      <label>每日执行时间（UTC+8）<input id="cronTimeInput" name="cron-time" type="time" value="21:00"></label>
+      <div class="cron-output" id="cronOutput" aria-live="polite"></div>
+      <p class="field-error" id="cronWarning" role="alert" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button class="button button-outline" id="copyCronButton" type="button"><svg aria-hidden="true" width="18" height="18"><use href="#icon-copy"></use></svg>复制</button>
+      </div>
     </form>
   </dialog>
 
@@ -232,30 +183,17 @@
 
   <svg class="svg-defs" aria-hidden="true">
     <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3 4.8 6v5.2c0 4.5 2.9 8.6 7.2 9.8 4.3-1.2 7.2-5.3 7.2-9.8V6L12 3Z"/><path d="m9.3 12 1.8 1.8 3.8-4"/></symbol>
-    <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20.2 15.3A8.4 8.4 0 0 1 8.7 3.8 8.5 8.5 0 1 0 20.2 15.3Z"/></symbol>
-    <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
-    <symbol id="icon-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
     <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/></symbol>
     <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 19h14"/></symbol>
     <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
-    <symbol id="icon-message" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/></symbol>
-    <symbol id="icon-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h.01M15.5 10h.01M8.5 14.5a5 5 0 0 0 7 0"/></symbol>
-    <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.5c3.5 0 5 10 9 10H20m0 0-3-3m3 3-3 3M4 17h3.5c1.7 0 2.9-2.4 4.1-4.8M16.5 7H20m0 0-3-3m3 3-3 3"/></symbol>
     <symbol id="icon-send" viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-8-8-2Z"/><path d="m11 13 5-5"/></symbol>
-    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
     <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
-    <symbol id="icon-code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4m8-8 4 4-4 4m-2-11-4 14"/></symbol>
-    <symbol id="icon-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
-    <symbol id="icon-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
-    <symbol id="icon-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7"/></symbol>
     <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
-    <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6V3Z"/><path d="M14 3v5h5"/></symbol>
-    <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2Z"/></symbol>
     <symbol id="icon-loader" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
-    <symbol id="icon-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 5a3.5 3.5 0 0 1 0 6.5M17.5 14.5a6 6 0 0 1 4 5.5"/></symbol>
-    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></symbol>
+    <symbol id="icon-grip" viewBox="0 0 24 24"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></symbol>
+    <symbol id="icon-check-filled" viewBox="0 0 256 256"><g fill="currentColor" stroke="none"><path d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0L104 147.43l98.34-97.09a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.32" opacity=".2"/><path d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.59 0L104 136.23l-36.69-35.6a16 16 0 0 0-22.58.05l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0L243.33 90.91a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24a.6.6 0 0 1 .08.08l42.35 41.09a8 8 0 0 0 11.19 0L208.06 56L232 79.6Z"/></g></symbol>
   </svg>
   <script type="module" src="app.js"></script>
 </body>

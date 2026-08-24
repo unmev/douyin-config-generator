@@ -27,8 +27,7 @@ test("creates a valid basic configuration", () => {
   ]);
   assert.deepEqual(config.stickers["比心"], {
     label: "比心",
-    category: "常用",
-    fallback_index: 3,
+    fallback_index: 1,
   });
   assert.equal(validateConfig(config).errors.length, 0);
 });

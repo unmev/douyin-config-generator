@@ -3,3 +3,4 @@ node_modules/
 
 # 浏览器测试生成产物
 tests/browser-output/
+.wrangler
