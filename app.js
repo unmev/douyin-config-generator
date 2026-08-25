@@ -71,6 +71,7 @@ const elements = {
   wizardError: $("#wizardError"),
   validationList: $("#validationList"),
   generateHint: $("#generateHint"),
+  statusPanel: $(".panel-status"),
 };
 
 function icon(name, size = 17) {
@@ -316,6 +317,17 @@ function showWizardError(message, field) {
   return false;
 }
 
+function emphasizeValidation() {
+  const panel = elements.statusPanel;
+  if (!panel) return;
+  panel.classList.remove("is-validation-highlighted");
+  void panel.offsetWidth;
+  panel.classList.add("is-validation-highlighted");
+  if (isSmallViewport()) {
+    window.requestAnimationFrame(() => panel.scrollIntoView({ behavior: "smooth", block: "end" }));
+  }
+}
+
 function showToast(message, error = false) {
   const toast = document.createElement("div");
   toast.className = `toast${error ? " is-error" : ""}`;
@@ -503,6 +515,7 @@ function getValidConfig() {
   const validation = validateConfig(config);
   if (validation.errors.length) {
     const first = validation.errors[0];
+    emphasizeValidation();
     showWizardError(`${first.path}：${first.message}`);
     return null;
   }
